@@ -1,8 +1,10 @@
-import logging
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+
+from common.log import trace_e
+import logging
+from tqdm import tqdm
 
 import pyro
 import pyro.distributions as dist
@@ -12,9 +14,6 @@ from pyro.infer.util import torch_item
 from pyro.nn import PyroModule
 from pyro.optim import ClippedAdam
 from pyro.util import torch_isnan
-
-logger = logging.getLogger(__name__)
-
 
 class FullyConnected(nn.Sequential):
     """
@@ -539,8 +538,9 @@ class TEDVAE(nn.Module):
         super().__init__()
         self.model = Model(config)
         self.guide = Guide(config)
-        # self.to_dev
-        self.cuda()
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.to(self.device)
+    
     def fit(self, x, t, y,
             num_epochs=100,
             batch_size=100,
@@ -572,19 +572,19 @@ class TEDVAE(nn.Module):
 
         dataset = TensorDataset(x, t, y)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-        logger.info("Training with {} minibatches per epoch".format(len(dataloader)))
+        logging.info("Training with {} minibatches per epoch".format(len(dataloader)))
         num_steps = num_epochs * len(dataloader)
         optim = ClippedAdam({"lr": learning_rate,
                              "weight_decay": weight_decay,
                              "lrd": learning_rate_decay ** (1 / num_steps)})
         svi = SVI(self.model, self.guide, optim, TraceCausalEffect_ELBO())
         losses = []
-        for epoch in range(num_epochs):
+        for i in tqdm(range(num_epochs), desc=f'train'):
             for x, t, y in dataloader:
                 # x = self.whiten(x)
                 loss = svi.step(x, t, y, size=len(dataset)) / len(dataset)
                 # print(loss)
-                logger.debug("step {: >5d} loss = {:0.6g}".format(len(losses), loss))
+                logging.debug("step {: >5d} loss = {:0.6g}".format(len(losses), loss))
                 assert not torch_isnan(loss)
                 losses.append(loss)
         return losses
@@ -614,7 +614,7 @@ class TEDVAE(nn.Module):
             assert x.dim() == 2 and x.size(-1) == self.feature_dim
 
         dataloader = [x] if batch_size is None else DataLoader(x, batch_size=batch_size)
-        logger.info("Evaluating {} minibatches".format(len(dataloader)))
+        logging.info("Evaluating {} minibatches".format(len(dataloader)))
         result = []
         for x in dataloader:
             # x = self.whiten(x)
@@ -627,7 +627,7 @@ class TEDVAE(nn.Module):
                     y1 = poutine.replay(self.model.y_mean, tr.trace)(x) * ys + ym
             ite = (y1 - y0).mean(0)
             if not torch._C._get_tracing_state():
-                logger.debug("batch ate = {:0.6g}".format(ite.mean()))
+                logging.debug("batch ate = {:0.6g}".format(ite.mean()))
             result.append(ite)
         return torch.cat(result)
 

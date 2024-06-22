@@ -1,0 +1,21 @@
+# data
+*.csv
+!person.csv
+!alias.csv
+!nickname.csv
+!tls.csv
+!attr.csv
+*.xlsx
+
+# notebook
+*.ipynb
+
+# build
+*.pyc
+
+# enviroment
+env
+
+# log
+*.log
+null
