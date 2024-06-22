@@ -6,7 +6,7 @@ import numpy as np
 import logging
 
 import pyro
-from tedvae_gpu import TEDVAE
+from model.tedvae import TEDVAE
 from datasets import IHDP
 from common.log import trace_e
 

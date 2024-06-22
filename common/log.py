@@ -25,15 +25,15 @@ def set_logger(level):
     fh.setLevel(level)
 
     # 再创建一个handler，用于输出到控制台
-    ch = logging.StreamHandler()
-    ch.setLevel(level)
+    # ch = logging.StreamHandler()
+    # ch.setLevel(level)
 
     # 定义handler的输出格式
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     fh.setFormatter(formatter)
-    ch.setFormatter(formatter)
+    # ch.setFormatter(formatter)
 
     # 给logger添加handler
     logger.addHandler(fh)
-    logger.addHandler(ch)
+    # logger.addHandler(ch)
     return logger
