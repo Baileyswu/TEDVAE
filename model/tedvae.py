@@ -30,7 +30,9 @@ class TEDVAE(nn.Module):
         super().__init__()
         self.model = Model(config)
         self.guide = Guide(config)
+        self.elbo = TraceCausalEffect_ELBO()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        logging.info(f'loading model to {self.device}')
         self.to(self.device)
     
     def fit(self, x, t, y,
@@ -69,11 +71,14 @@ class TEDVAE(nn.Module):
         optim = ClippedAdam({"lr": learning_rate,
                              "weight_decay": weight_decay,
                              "lrd": learning_rate_decay ** (1 / num_steps)})
-        svi = SVI(self.model, self.guide, optim, TraceCausalEffect_ELBO())
+        svi = SVI(self.model, self.guide, optim, self.elbo)
         losses = []
         for i in tqdm(range(num_epochs), desc=f'train'):
             for x, t, y in dataloader:
                 # x = self.whiten(x)
+                x = x.to(self.device)
+                t = t.to(self.device)
+                y = y.to(self.device)
                 loss = svi.step(x, t, y, size=len(dataset)) / len(dataset)
                 # print(loss)
                 logging.debug("step {: >5d} loss = {:0.6g}".format(len(losses), loss))
@@ -137,3 +142,9 @@ class TEDVAE(nn.Module):
             # Disable check_trace due to nondeterministic nodes.
             result = torch.jit.trace_module(self, {"ite": (fake_x,)}, check_trace=False)
         return result
+
+    def is_on_cuda(self):
+        try:
+            return next(self.parameters()).is_cuda
+        except StopIteration:
+            return False  # 如果模型没有任何参数，这将避免错误
