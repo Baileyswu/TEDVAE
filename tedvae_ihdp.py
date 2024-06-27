@@ -13,8 +13,17 @@ from common.log import trace_e
 def main(args, reptition = 1, path = "./IHDP/"):
     pyro.enable_validation(__debug__)
 
-    if args.cuda:
+    if args.cuda is False:
+        device = 'cpu'
+    elif torch.cuda.is_available():
+        device = 'cuda'
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    else:
+        logging.warning('no GPU')
+        args.cuda = False
+
+    logging.info(f'device:{device}')
+    logging.info(f'args.cuda:{args.cuda}')
 
     # Generate synthetic data.
     pyro.set_rng_seed(args.seed)
@@ -37,7 +46,8 @@ def main(args, reptition = 1, path = "./IHDP/"):
         latent_dim_y=args.latent_dim_y,
         hidden_dim=args.hidden_dim,
         num_layers=args.num_layers,
-        num_samples=10)
+        num_samples=10,
+        device=device)
     tedvae.fit(x_train, t_train, y_train,
               num_epochs=args.num_epochs,
               batch_size=args.batch_size,

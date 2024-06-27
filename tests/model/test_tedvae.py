@@ -1,6 +1,6 @@
-from model.tedvae import TEDVAE
 import pytest
 from unittest.mock import Mock
+from model.tedvae import TEDVAE
 
 
 @pytest.fixture
@@ -22,11 +22,12 @@ def mock_args():
     mock_arg.weight_decay=1e-4
     mock_arg.seed=1234567890
     mock_arg.jit = True
-    mock_arg.cuda = False
+    mock_arg.cuda = True
     return mock_arg
 
 
 def test_TEDVAE():
+    # 解决参数调用 . 的问题，不能用字典
     args = mock_args
     contfeats = 6
     binfeats = 19

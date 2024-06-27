@@ -15,7 +15,7 @@ from .loss import TraceCausalEffect_ELBO
 
 class TEDVAE(nn.Module):
     def __init__(self, feature_dim, continuous_dim, binary_dim, outcome_dist="normal", 
-                 latent_dim=20, latent_dim_t=20, latent_dim_y=20 , hidden_dim=200, num_layers=3, num_samples=100):
+                 latent_dim=20, latent_dim_t=20, latent_dim_y=20 , hidden_dim=200, num_layers=3, num_samples=100, device='cpu'):
         config = dict(feature_dim=feature_dim, latent_dim=latent_dim,
                       latent_dim_t = latent_dim_t, latent_dim_y = latent_dim_y,
                       hidden_dim=hidden_dim, num_layers=num_layers, continuous_dim = continuous_dim, binary_dim = binary_dim,
@@ -31,8 +31,8 @@ class TEDVAE(nn.Module):
         self.model = Model(config)
         self.guide = Guide(config)
         self.elbo = TraceCausalEffect_ELBO()
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logging.info(f'loading model to {self.device}')
+        logging.info(f'loading model to device:{device}')
+        self.device = device
         self.to(self.device)
     
     def fit(self, x, t, y,
@@ -65,7 +65,10 @@ class TEDVAE(nn.Module):
         # self.whiten = PreWhitener(x)
 
         dataset = TensorDataset(x, t, y)
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        generator = torch.Generator(self.device)
+        logging.info(f'generator.device: {generator.device}')
+        assert generator.device.type == self.device, 'generate.device != model.device'
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, generator=generator)
         logging.info("Training with {} minibatches per epoch".format(len(dataloader)))
         num_steps = num_epochs * len(dataloader)
         optim = ClippedAdam({"lr": learning_rate,
@@ -76,9 +79,6 @@ class TEDVAE(nn.Module):
         for i in tqdm(range(num_epochs), desc=f'train'):
             for x, t, y in dataloader:
                 # x = self.whiten(x)
-                x = x.to(self.device)
-                t = t.to(self.device)
-                y = y.to(self.device)
                 loss = svi.step(x, t, y, size=len(dataset)) / len(dataset)
                 # print(loss)
                 logging.debug("step {: >5d} loss = {:0.6g}".format(len(losses), loss))
